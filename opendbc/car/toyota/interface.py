@@ -151,6 +151,11 @@ class CarInterface(CarInterfaceBase):
       tune.kiV = [0.5]
       ret.vEgoStopping = 0.25
       ret.vEgoStarting = 0.25
+
+      # Since we compensate for imprecise acceleration in carcontroller, we can be less aggressive with tuning
+      # This also prevents unnecessary request windup due to internal car jerk limits
+      if ret.flags & ToyotaFlags.RAISED_ACCEL_LIMIT:
+        tune.kiV = [0.25]
     else:
       tune.kpV = [0.]
       tune.kiV = [1.2] # appears to produce minimal oscillation on TSS-P
