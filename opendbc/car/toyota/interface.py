@@ -45,7 +45,8 @@ class CarInterface(CarInterfaceBase):
 
     # Detect smartDSU, which intercepts ACC_CMD from the DSU (or radar) allowing openpilot to send it
     # 0x2AA is sent by a similar device which intercepts the radar instead of DSU on NO_DSU_CARs
-    if 0x2FF in fingerprint[0] or (0x2AA in fingerprint[0] and candidate in NO_DSU_CAR):
+    # or (0x2AA in fingerprint[0] and candidate in NO_DSU_CAR)
+    if 0x2FF in fingerprint[0]:
       ret.flags |= ToyotaFlags.SMART_DSU.value
 
     # In TSS2 cars, the camera does long control
