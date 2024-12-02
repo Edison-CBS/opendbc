@@ -54,7 +54,7 @@ class CarInterface(CarInterfaceBase):
     ret.enableDsu = len(found_ecus) > 0 and Ecu.dsu not in found_ecus and candidate not in (NO_DSU_CAR | UNSUPPORTED_DSU_CAR) \
                                         and not (ret.flags & ToyotaFlags.SMART_DSU)
 
-    if candidate in (CAR.LEXUS_ES_TSS2, CAR.TOYOTA_COROLLA_TSS2) and Ecu.hybrid not in found_ecus:
+    if candidate in (CAR.LEXUS_ES_TSS2,) and Ecu.hybrid not in found_ecus:
       ret.flags |= ToyotaFlags.RAISED_ACCEL_LIMIT.value
 
     if candidate == CAR.TOYOTA_PRIUS:
@@ -150,20 +150,10 @@ class CarInterface(CarInterfaceBase):
     # to a negative value, so it won't matter.
     ret.minEnableSpeed = -1. if stop_and_go else MIN_ACC_SPEED
 
-    tune = ret.longitudinalTuning
     if candidate in TSS2_CAR:
-      tune.kpV = [0.0]
-      tune.kiV = [0.5]
       ret.vEgoStopping = 0.25
       ret.vEgoStarting = 0.25
       ret.stoppingDecelRate = 0.3  # reach stopping target smoothly
-
-      # Since we compensate for imprecise acceleration in carcontroller and error correct on aEgo, we can avoid using gains
-      if ret.flags & ToyotaFlags.RAISED_ACCEL_LIMIT:
-        tune.kiV = [0.0]
-    else:
-      tune.kiBP = [0., 5., 35.]
-      tune.kiV = [3.6, 2.4, 1.5]
 
     return ret
 
