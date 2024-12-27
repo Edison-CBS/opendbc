@@ -46,6 +46,7 @@ class CarControllerParams:
 class ToyotaFlags(IntFlag):
   # Detected flags
   HYBRID = 1
+  SMART_DSU = 2
   DISABLE_RADAR = 4
 
   # Static flags
@@ -56,7 +57,7 @@ class ToyotaFlags(IntFlag):
   # these cars use the Lane Tracing Assist (LTA) message for lateral control
   ANGLE_CONTROL = 128
   NO_STOP_TIMER = 256
-  # these cars are speculated to allow stop and go when the DSU is unplugged
+  # these cars are speculated to allow stop and go when the DSU is unplugged or disabled with sDSU
   SNG_WITHOUT_DSU = 512
   # these cars can utilize 2.0 m/s^2
   RAISED_ACCEL_LIMIT = 1024
@@ -575,7 +576,7 @@ STEER_THRESHOLD = 100
 
 # These cars have non-standard EPS torque scale factors. All others are 73
 EPS_SCALE = defaultdict(lambda: 73,
-                        {CAR.TOYOTA_PRIUS: 66, CAR.TOYOTA_COROLLA: 88, CAR.LEXUS_IS: 77, CAR.LEXUS_RC: 77, CAR.LEXUS_CTH: 100, CAR.TOYOTA_PRIUS_V: 100})
+                        {CAR.TOYOTA_PRIUS: 66, CAR.TOYOTA_COROLLA: 88, CAR.LEXUS_IS: 77, CAR.LEXUS_RC: 77, CAR.LEXUS_CTH: 100, CAR.TOYOTA_PRIUS_V: 118})
 
 # Toyota/Lexus Safety Sense 2.0 and 2.5
 TSS2_CAR = CAR.with_flags(ToyotaFlags.TSS2)
