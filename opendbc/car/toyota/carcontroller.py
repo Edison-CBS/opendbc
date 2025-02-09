@@ -216,7 +216,7 @@ class CarController(CarControllerBase):
           else:
             self.distance_button = 0
 
-        if self.CP.carFingerprint == CAR.TOYOTA_PRIUS_V:
+        if self.CP.carFingerprint == CAR.TOYOTA_PRIUS_V and self.CP.longitudinalCydiaTuning:
           # Set thresholds for compensatory force calculations
           comp_thresh = float(np.interp(CS.out.vEgo, COMPENSATORY_CALCULATION_THRESHOLD_BP, COMPENSATORY_CALCULATION_THRESHOLD_V))
           if not CC.longActive:

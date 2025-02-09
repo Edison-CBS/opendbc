@@ -154,6 +154,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.8, 2., 1.2]
       ret.stoppingDecelRate = 0.24  # reach stopping target smoothly
       ret.longitudinalActuatorDelay = 0.05
+      ret.isToyotaPriusV = True
 
     if candidate in TSS2_CAR:
       ret.flags |= ToyotaFlags.RAISED_ACCEL_LIMIT.value
