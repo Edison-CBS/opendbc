@@ -151,8 +151,12 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.TOYOTA_PRIUS_V:
       ret.isToyotaPriusV = True
-      ret.longitudinalTuning.kiBP = [0., 15, 25]
-      ret.longitudinalTuning.kiV = [0.8, 1., 1.2]
+
+      ret.longitudinalTuning.kiBP = [0., 25]
+      ret.longitudinalTuning.kiV = [0.8, 1.2]
+
+      ret.vEgoStopping = 0.25
+      ret.vEgoStarting = 0.2
 
     if candidate in TSS2_CAR:
       ret.flags |= ToyotaFlags.RAISED_ACCEL_LIMIT.value
