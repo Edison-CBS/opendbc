@@ -530,8 +530,8 @@ struct CarParams {
   secOcRequired @75 :Bool;  # Car requires SecOC message authentication to operate
   secOcKeyAvailable @76 :Bool;  # Stored SecOC key loaded from params
 
-  isToyotaPriusV @77 :Bool;
-  longitudinalCydiaTuning @78 :Bool;
+  isToyotaPriusV @78 :Bool;
+  longitudinalCydiaTuning @79 :Bool;
 
   struct SafetyConfig {
     safetyModel @0 :SafetyModel;
