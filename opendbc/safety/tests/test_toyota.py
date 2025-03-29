@@ -424,7 +424,7 @@ class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
     self.assertTrue(self.safety.get_acc_main_on())
 
     # 收到 0x365 → 應被忽略（acc_main_on 仍為 True）
-    msg = libsafety_py.make_CANPacket(0x365, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00')
+    msg = libsafety_py.make_CANPacket(0x365, 0, b'\x01\x00\x00\x00\x00\x00\x00\x00')
     self._rx(msg)
     self.assertTrue(self.safety.get_acc_main_on())
 
