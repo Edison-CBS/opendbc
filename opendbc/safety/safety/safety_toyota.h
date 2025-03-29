@@ -168,8 +168,6 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
 }
 
 static bool toyota_tx_hook(const CANPacket_t *to_send) {
-  bool sport_mode = (alternative_experience & ALT_EXP_RAISE_LONGITUDINAL_LIMITS_TO_ISO_MAX) != 0;
-
   const TorqueSteeringLimits TOYOTA_TORQUE_STEERING_LIMITS = {
     .max_torque = 1500,
     .max_rate_up = 15,          // ramp up slow
@@ -210,11 +208,6 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
     .min_accel = -3500,  // -3.5 m/s2
   };
 
-  const LongitudinalLimits TOYOTA_LONG_LIMITS_SPORT = {
-    .max_accel = 4000,   // 4.0 m/s2
-    .min_accel = -3500,  // -3.5 m/s2
-  };
-
   bool tx = true;
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
@@ -239,11 +232,7 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
         }
       } else {
         // 若是非 stock 模式，檢查加速度是否在安全範圍內
-        if (sport_mode) {
-          violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS_SPORT);
-        } else {
-          violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
-        }
+        violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
       }
 
       if (violation) {
