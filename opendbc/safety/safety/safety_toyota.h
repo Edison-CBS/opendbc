@@ -167,6 +167,11 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
   }
 }
 
+static bool toyota_get_acc_main_on(const CANPacket_t *to_push) {
+  (void)to_push;  // 如果目前不使用，這樣寫可以避免 compiler warning
+  return acc_main_on;
+}
+
 static bool toyota_tx_hook(const CANPacket_t *to_send) {
   const TorqueSteeringLimits TOYOTA_TORQUE_STEERING_LIMITS = {
     .max_torque = 1500,
@@ -442,4 +447,5 @@ const safety_hooks toyota_hooks = {
   .get_checksum = toyota_get_checksum,
   .compute_checksum = toyota_compute_checksum,
   .get_quality_flag_valid = toyota_get_quality_flag_valid,
+  .get_acc_main_on = toyota_get_acc_main_on,
 };

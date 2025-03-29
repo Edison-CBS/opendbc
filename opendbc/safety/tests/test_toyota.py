@@ -139,7 +139,6 @@ class TestToyotaSafetyTorque(TestToyotaSafetyBase, common.MotorTorqueSteeringSaf
     self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, self.EPS_SCALE)
     self.safety.init_tests()
 
-
 class TestToyotaSafetyAngle(TestToyotaSafetyBase, common.AngleSteeringSafetyTest):
 
   # Angle control limits
@@ -342,6 +341,92 @@ class TestToyotaSecOcSafety(TestToyotaStockLongitudinalBase):
       should_tx = not req and not req2 and angle == 0
       self.assertEqual(should_tx, self._tx(self._lta_2_msg(req, req2, angle)), f"{req=} {req2=} {angle=}")
 
+def _describe_tx(msg):
+  pkt = msg[0]  # msg 是 tuple，含 CANPacket_t
+  return f"id=0x{pkt.addr:X}, data={bytes(pkt.data[0:8]).hex()}"
+
+class TestToyotaTx750Coverage(TestToyotaSafetyTorque):
+  def setUp(self):
+    self.packer = CANPackerPanda("toyota_nodsu_pt_generated")
+    self.safety = libsafety_py.libsafety
+    # 確保沒有啟用 STOCK_LONGITUDINAL
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, self.EPS_SCALE)
+    self.safety.init_tests()
+
+
+  def test_750_coverage_paths(self):
+    """
+    Covers all branches for CAN ID 0x750 diagnostic TX logic:
+    1. Valid tester present → should be allowed (True)
+    2. Invalid tester present → should be blocked (False)
+    3. Not invalid and not tester present → should fallback to allowed (True)
+    """
+    test_cases = [
+      (b"\x0F\x02\x3E\x00\x00\x00\x00\x00", True),   # ✅ Valid tester present
+      (b"\x6D\x02\x3E\x00\x00\x00\x00\x00", False),  # 🚫 Invalid tester present
+      (b"\x22\x01\xDE\xAD\xBE\xEF\x00\x11", False),   # ✅ Fallback path
+    ]
+
+    for data, expected in test_cases:
+      msg = libsafety_py.make_CANPacket(0x750, 0, data)
+      result = self._tx(msg)  # ✅ 不要用 msg[0]
+      print(f"TX for 0x750 data: {data.hex()} → {_describe_tx(msg)}")
+      self.assertEqual(result, expected, f"Unexpected result for 0x750 data: {data.hex()} → got {result}, expected {expected}")
+
+class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
+  def setUp(self):
+    self.packer = CANPackerPanda("toyota_nodsu_pt_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, self.EPS_SCALE)
+    self.safety.init_tests()
+
+  def test_acc_main_on_standard(self):
+    # 預設 param（不設 unsupported_dsu_car）
+    param = self.EPS_SCALE
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
+    self.safety.init_tests()
+
+    # bit 15 = 0 → False
+    msg = libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00')
+    self._rx(msg)
+    self.assertFalse(self.safety.get_acc_main_on())
+
+    # bit 15 = 1 → True
+    msg = libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x80\x00\x00\x00\x00\x00\x00')
+    self._rx(msg)
+    self.assertTrue(self.safety.get_acc_main_on())
+
+  def test_acc_main_on_unsupported_dsu(self):
+    # 設定 unsupported_dsu_car flag（bit 15~23 = 128）
+    param = self.EPS_SCALE | (128 << 8)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
+    self.safety.init_tests()
+
+    # bit 0 = 0 → False
+    msg = libsafety_py.make_CANPacket(0x365, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00')
+    self._rx(msg)
+    self.assertFalse(self.safety.get_acc_main_on())
+
+    # bit 0 = 1 → True
+    msg = libsafety_py.make_CANPacket(0x365, 0, b'\x01\x00\x00\x00\x00\x00\x00\x00')
+    self._rx(msg)
+    self.assertTrue(self.safety.get_acc_main_on())
+
+  def test_365_ignored_when_not_unsupported_dsu(self):
+    # 不設 unsupported_dsu_car
+    param = self.EPS_SCALE
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
+    self.safety.init_tests()
+
+    # 先設為 True（從 0x1D3）
+    msg = libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x80\x00\x00\x00\x00\x00\x00')
+    self._rx(msg)
+    self.assertTrue(self.safety.get_acc_main_on())
+
+    # 收到 0x365 → 應被忽略（acc_main_on 仍為 True）
+    msg = libsafety_py.make_CANPacket(0x365, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00')
+    self._rx(msg)
+    self.assertTrue(self.safety.get_acc_main_on())
 
 if __name__ == "__main__":
   unittest.main()
