@@ -384,7 +384,6 @@ class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
     # 預設 param（不設 unsupported_dsu_car）
     param = self.EPS_SCALE
     self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
-    print("unsupported_dsu =", self.safety.get_flag_unsupported_dsu())
     print("param =", param)
     print("acc_main_on =", self.safety.get_acc_main_on())
     self.safety.init_tests()
@@ -406,7 +405,6 @@ class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
     # 設定 unsupported_dsu_car flag（bit 15~23 = 128）
     param = self.EPS_SCALE | (128 << 8)
     self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
-    print("unsupported_dsu =", self.safety.get_flag_unsupported_dsu())
     print("param =", param)
     print("acc_main_on =", self.safety.get_acc_main_on())
     self.safety.init_tests()
@@ -425,7 +423,6 @@ class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
     # 不設 unsupported_dsu_car
     param = self.EPS_SCALE
     self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
-    print("unsupported_dsu =", self.safety.get_flag_unsupported_dsu())
     print("param =", param)
     print("acc_main_on =", self.safety.get_acc_main_on())
     self.safety.init_tests()
