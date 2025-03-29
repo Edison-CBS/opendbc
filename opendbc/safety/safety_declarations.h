@@ -181,7 +181,7 @@ typedef struct {
   compute_checksum_t compute_checksum;
   get_counter_t get_counter;
   get_quality_flag_valid_t get_quality_flag_valid;
-  get_acc_main_on_t *get_acc_main_on;
+  get_acc_main_on_t get_acc_main_on;
 } safety_hooks;
 
 bool safety_rx_hook(const CANPacket_t *to_push);
