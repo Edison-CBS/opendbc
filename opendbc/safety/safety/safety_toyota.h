@@ -145,11 +145,12 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
       // ACC main switch on is a prerequisite to enter controls, exit controls immediately on main switch off
       // Signal: PCM_CRUISE_2/MAIN_ON at 15th bit
       acc_main_on = GET_BIT(to_push, 15U) != 0U;
-      printf("acc_main_on update from 0x1D3: bit15=%d, acc_main_on=%d\n", GET_BIT(to_push, 15U), acc_main_on);
+      LOG("0x1D3 received, bit 15 = %d, acc_main_on = %d\n", GET_BIT(to_push, 15U), acc_main_on);
     }
 
     if ((addr == 0x365) && toyota_unsupported_dsu_car) {
       acc_main_on = GET_BIT(to_push, 0U) != 0U;
+      LOG("0x365 received, bit 0 = %d, acc_main_on = %d\n", GET_BIT(to_push, 0U), acc_main_on);
     }
 
     // sample speed

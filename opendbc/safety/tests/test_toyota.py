@@ -375,6 +375,9 @@ class TestToyotaTx750Coverage(TestToyotaSafetyTorque):
 
 class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
   def setUp(self):
+    print("unsupported_dsu =", self.safety.get_flag_unsupported_dsu())
+    print("param =", param)
+    print("acc_main_on =", self.safety.get_acc_main_on())
     self.packer = CANPackerPanda("toyota_nodsu_pt_generated")
     self.safety = libsafety_py.libsafety
     self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, self.EPS_SCALE)
@@ -388,7 +391,10 @@ class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
 
     # bit 15 = 0 → False
     msg = libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00')
+    print("Before _rx:", self.safety.get_acc_main_on())
     self._rx(msg)
+    print("After _rx:", self.safety.get_acc_main_on())
+    print("ACC MAIN ON (0x1D3):", self.safety.get_acc_main_on())  # <<== 預期 True
     self.assertFalse(self.safety.get_acc_main_on())
 
     # bit 15 = 1 → True
