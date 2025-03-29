@@ -176,8 +176,7 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
   }
 }
 
-static bool toyota_get_acc_main_on(const CANPacket_t *to_push) {
-  (void)to_push;  // 如果目前不使用，這樣寫可以避免 compiler warning
+bool toyota_get_acc_main_on(void) {
   return acc_main_on;
 }
 
