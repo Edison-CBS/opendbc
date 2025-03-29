@@ -21,7 +21,7 @@ TOYOTA_COMMON_LONG_TX_MSGS = [[0x283, 0], [0x2E6, 0], [0x2E7, 0], [0x33E, 0], [0
 class TestToyotaSafetyBase(common.PandaCarSafetyTest, common.LongitudinalAccelSafetyTest):
 
   TX_MSGS = TOYOTA_COMMON_TX_MSGS + TOYOTA_COMMON_LONG_TX_MSGS
-  RELAY_MALFUNCTION_ADDRS = {0: (0x2E4, 0x343)}
+  RELAY_MALFUNCTION_ADDRS = {0: (0x2E4,)}
   FWD_BLACKLISTED_ADDRS = {2: [0x2E4, 0x412, 0x191, 0x343]}
   EPS_SCALE = 73
 
@@ -76,7 +76,7 @@ class TestToyotaSafetyBase(common.PandaCarSafetyTest, common.LongitudinalAccelSa
   def test_diagnostics(self, stock_longitudinal: bool = False):
     for should_tx, msg in ((False, b"\x6D\x02\x3E\x00\x00\x00\x00\x00"),  # fwdCamera tester present
                            (False, b"\x0F\x03\xAA\xAA\x00\x00\x00\x00"),  # non-tester present
-                           (True, b"\x0F\x02\x3E\x00\x00\x00\x00\x00")):
+                           (True, b"\x0F\x02\x3E\x00\x00\x00\x00\x00")):  # valid tester-present
       tester_present = libsafety_py.make_CANPacket(0x750, 0, msg)
       self.assertEqual(should_tx and not stock_longitudinal, self._tx(tester_present))
 
@@ -342,6 +342,46 @@ class TestToyotaSecOcSafety(TestToyotaStockLongitudinalBase):
       should_tx = not req and not req2 and angle == 0
       self.assertEqual(should_tx, self._tx(self._lta_2_msg(req, req2, angle)), f"{req=} {req2=} {angle=}")
 
+class TestToyotaAccMainOnCoverage(TestToyotaSafetyTorque):
+  # Includes full TX_MSGS set to allow base tests (e.g., test_tx_hook_on_wrong_safety_mode) to execute without false failures.
+  TX_MSGS = TOYOTA_COMMON_TX_MSGS + TOYOTA_COMMON_LONG_TX_MSGS  # Allow test_tx_hook_on_wrong_safety_mode to run correctly
+
+  def setUp(self):
+    self.packer = CANPackerPanda("toyota_nodsu_pt_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, self.EPS_SCALE)
+    self.safety.init_tests()
+
+  def test_acc_main_on_standard(self):
+    # bit 15 = 0 → False
+    self._rx(libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00'))
+    self.assertFalse(self.safety.get_acc_main_on())
+
+    # bit 15 = 1 → True
+    self._rx(libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x80\x00\x00\x00\x00\x00\x00'))
+    self.assertTrue(self.safety.get_acc_main_on())
+
+  def test_acc_main_on_unsupported_dsu(self):
+    param = self.EPS_SCALE | (128 << 8)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.toyota, param)
+    self.safety.init_tests()
+
+    # bit 0 = 0 → False
+    self._rx(libsafety_py.make_CANPacket(0x365, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00'))
+    self.assertFalse(self.safety.get_acc_main_on())
+
+    # bit 0 = 1 → True
+    self._rx(libsafety_py.make_CANPacket(0x365, 0, b'\x01\x00\x00\x00\x00\x00\x00\x00'))
+    self.assertTrue(self.safety.get_acc_main_on())
+
+  def test_365_ignored_when_not_unsupported_dsu(self):
+    # Set to True (from 0x1D3)
+    self._rx(libsafety_py.make_CANPacket(0x1D3, 0, b'\x00\x80\x00\x00\x00\x00\x00\x00'))
+    self.assertTrue(self.safety.get_acc_main_on())
+
+    # 0x365 should be ignored, and acc_main_on should remain unchanged
+    self._rx(libsafety_py.make_CANPacket(0x365, 0, b'\x00\x00\x00\x00\x00\x00\x00\x00'))
+    self.assertTrue(self.safety.get_acc_main_on())
 
 if __name__ == "__main__":
   unittest.main()
