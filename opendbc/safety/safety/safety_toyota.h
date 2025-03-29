@@ -226,21 +226,23 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
       int desired_accel = (GET_BYTE(to_send, 0) << 8) | GET_BYTE(to_send, 1);
       desired_accel = to_signed(desired_accel, 16);
 
+      bool cancel_req = GET_BIT(to_send, 24U);
       bool violation = false;
-      if (sport_mode) {
-        violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS_SPORT);
-      } else {
-        violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
-      }
 
-      // only ACC messages that cancel are allowed when openpilot is not controlling longitudinal
       if (toyota_stock_longitudinal) {
-        bool cancel_req = GET_BIT(to_send, 24U);
+        // 在 stock longitudinal 模式下，只允許 cancel 指令，且 accel 必須為 inactive_accel（通常是 0）
         if (!cancel_req) {
           violation = true;
         }
         if (desired_accel != TOYOTA_LONG_LIMITS.inactive_accel) {
           violation = true;
+        }
+      } else {
+        // 若是非 stock 模式，檢查加速度是否在安全範圍內
+        if (sport_mode) {
+          violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS_SPORT);
+        } else {
+          violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
         }
       }
 
