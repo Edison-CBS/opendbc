@@ -2,6 +2,13 @@
 
 #include "safety_declarations.h"
 
+#ifdef DEBUG
+#include <stdio.h>
+#define LOG(...) printf(__VA_ARGS__)
+#else
+#define LOG(...) ((void)0)
+#endif
+
 // Stock longitudinal
 #define TOYOTA_BASE_TX_MSGS \
   {0x191, 0, 8, false}, {0x412, 0, 8, false}, {0x1D2, 0, 8, false}, /* LKAS + LTA + PCM cancel cmd */  \
