@@ -4,7 +4,8 @@
 
 // Stock longitudinal
 #define TOYOTA_BASE_TX_MSGS \
-  {0x191, 0, 8, false}, {0x412, 0, 8, false}, {0x1D2, 0, 8, false},  /* LKAS + LTA + PCM cancel cmd */  \
+  {0x191, 0, 8, false}, {0x412, 0, 8, false}, {0x1D2, 0, 8, false}, /* LKAS + LTA + PCM cancel cmd */  \
+  {0x750, 0, 8, false},  /* white list 0x750 for Enhanced Diagnostic Request */  \
 
 #define TOYOTA_COMMON_TX_MSGS \
   TOYOTA_BASE_TX_MSGS \
@@ -22,7 +23,7 @@
   {0x128, 1, 6, false}, {0x141, 1, 4, false}, {0x160, 1, 8, false}, {0x161, 1, 7, false}, {0x470, 1, 4, false},  /* DSU bus 1 */                                                                    \
   {0x411, 0, 8, false},  /* PCS_HUD */                                                                                                                                                              \
   {0x750, 0, 8, false},  /* radar diagnostic address */                                                                                                                                             \
-  {0x343, 0, 8, true},  /* ACC */                                                                                                                                                                   \
+  {0x343, 0, 8, false},  /* ACC */                                                                                                                                                                   \
 
 #define TOYOTA_COMMON_RX_CHECKS(lta)                                                                          \
   {.msg = {{ 0xaa, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 83U}, { 0 }, { 0 }}},  \
@@ -49,6 +50,8 @@ static bool toyota_alt_brake = false;
 static bool toyota_stock_longitudinal = false;
 static bool toyota_lta = false;
 static int toyota_dbc_eps_torque_factor = 100;   // conversion factor for STEER_TORQUE_EPS in %: see dbc file
+
+static bool toyota_unsupported_dsu_car = false;
 
 static uint32_t toyota_compute_checksum(const CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
@@ -137,6 +140,17 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
       }
     }
 
+    // wrap lateral controls on main
+    if (addr == 0x1D3) {
+      // ACC main switch on is a prerequisite to enter controls, exit controls immediately on main switch off
+      // Signal: PCM_CRUISE_2/MAIN_ON at 15th bit
+      acc_main_on = GET_BIT(to_push, 15U) != 0U;
+    }
+
+    if ((addr == 0x365) && toyota_unsupported_dsu_car) {
+      acc_main_on = GET_BIT(to_push, 0U) != 0U;
+    }
+
     // sample speed
     if (addr == 0xaa) {
       int speed = 0;
@@ -154,6 +168,8 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
 }
 
 static bool toyota_tx_hook(const CANPacket_t *to_send) {
+  bool sport_mode = (alternative_experience & ALT_EXP_RAISE_LONGITUDINAL_LIMITS_TO_ISO_MAX) != 0;
+
   const TorqueSteeringLimits TOYOTA_TORQUE_STEERING_LIMITS = {
     .max_torque = 1500,
     .max_rate_up = 15,          // ramp up slow
@@ -166,7 +182,7 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
     // we allow setting STEER_REQUEST bit to 0 while maintaining the requested torque value for a single frame
     .min_valid_request_frames = 18,
     .max_invalid_request_frames = 1,
-    .min_valid_request_rt_interval = 171000,  // 171ms; a ~10% buffer on cutting every 19 frames
+    .min_valid_request_rt_interval = 170000,  // 170ms; a ~10% buffer on cutting every 19 frames
     .has_steer_req_tolerance = true,
   };
 
@@ -194,6 +210,11 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
     .min_accel = -3500,  // -3.5 m/s2
   };
 
+  const LongitudinalLimits TOYOTA_LONG_LIMITS_SPORT = {
+    .max_accel = 4000,   // 4.0 m/s2
+    .min_accel = -3500,  // -3.5 m/s2
+  };
+
   bool tx = true;
   int addr = GET_ADDR(to_send);
   int bus = GET_BUS(to_send);
@@ -206,7 +227,11 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
       desired_accel = to_signed(desired_accel, 16);
 
       bool violation = false;
-      violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
+      if (sport_mode) {
+        violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS_SPORT);
+      } else {
+        violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
+      }
 
       // only ACC messages that cancel are allowed when openpilot is not controlling longitudinal
       if (toyota_stock_longitudinal) {
@@ -319,8 +344,8 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
     bool invalid_uds_msg = (GET_BYTES(to_send, 0, 4) != 0x003E020FU) || (GET_BYTES(to_send, 4, 4) != 0x0U);
     if (invalid_uds_msg) {
       tx = 0;
-    }
   }
+}
 
   return tx;
 }
@@ -346,6 +371,8 @@ static safety_config toyota_init(uint16_t param) {
   const uint32_t TOYOTA_PARAM_STOCK_LONGITUDINAL = 2UL << TOYOTA_PARAM_OFFSET;
   const uint32_t TOYOTA_PARAM_LTA = 4UL << TOYOTA_PARAM_OFFSET;
 
+  const uint32_t TOYOTA_PARAM_UNSUPPORTED_DSU_CAR = 128UL << TOYOTA_PARAM_OFFSET;
+
 #ifdef ALLOW_DEBUG
   const uint32_t TOYOTA_PARAM_SECOC = 8UL << TOYOTA_PARAM_OFFSET;
   toyota_secoc = GET_FLAG(param, TOYOTA_PARAM_SECOC);
@@ -355,6 +382,7 @@ static safety_config toyota_init(uint16_t param) {
   toyota_stock_longitudinal = GET_FLAG(param, TOYOTA_PARAM_STOCK_LONGITUDINAL);
   toyota_lta = GET_FLAG(param, TOYOTA_PARAM_LTA);
   toyota_dbc_eps_torque_factor = param & TOYOTA_EPS_FACTOR;
+  toyota_unsupported_dsu_car = GET_FLAG(param, TOYOTA_PARAM_UNSUPPORTED_DSU_CAR);
 
   safety_config ret;
   if (toyota_stock_longitudinal) {
