@@ -163,18 +163,21 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiV = [0.8, 1.2]
 
       ret.vEgoStopping = 0.25
-      ret.vEgoStarting = 0.2
+      ret.vEgoStarting = 0.25
+
+      ret.longitudinalActuatorDelay = 0.05
+      ret.stoppingDecelRate = 0.3  # reach stopping target smoothly
 
     if candidate in TSS2_CAR:
       ret.flags |= ToyotaFlags.RAISED_ACCEL_LIMIT.value
 
       ret.vEgoStopping = 0.25
       ret.vEgoStarting = 0.25
-
-    # Hybrids have much quicker longitudinal actuator response
-    if ret.flags & ToyotaFlags.HYBRID.value:
-      ret.longitudinalActuatorDelay = 0.05
       ret.stoppingDecelRate = 0.3  # reach stopping target smoothly
+
+      # Hybrids have much quicker longitudinal actuator response
+      if ret.flags & ToyotaFlags.HYBRID.value:
+        ret.longitudinalActuatorDelay = 0.05
 
     return ret
 
