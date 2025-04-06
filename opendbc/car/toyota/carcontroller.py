@@ -176,7 +176,7 @@ class CarController(CarControllerBase):
 
     # *** gas and brake ***
 
-    if self.CP.isToyotaPriusV:
+    if self.CP.longitudinalCydiaTuning:
       # *** standstill logic ***
       # mimic stock behaviour, set standstill_req to False only when openpilot wants to resume
       if not CC.cruiseControl.resume:
@@ -197,7 +197,7 @@ class CarController(CarControllerBase):
       # ignore standstill on NO_STOP_TIMER_CAR
       self.standstill_req = actuators.longControlState == LongCtrlState.stopping and self.standstill_req_ready and self.stop_timer > 0.1 / DT_CTRL
     else:
-       # on entering standstill, send standstill request
+      # on entering standstill, send standstill request
       if CS.out.standstill and not self.last_standstill and (self.CP.carFingerprint not in NO_STOP_TIMER_CAR):
         self.standstill_req = True
       if CS.pcm_acc_status != 8:
@@ -210,7 +210,7 @@ class CarController(CarControllerBase):
     steer_alert = hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw)
     # lead = hud_control.leadVisible or CS.out.vEgo < 12.  # at low speed we always assume the lead is present so ACC can be engaged
 
-    if self.CP.isToyotaPriusV:
+    if self.CP.longitudinalCydiaTuning:
       # *** ui hysteresis ***
       if self.frame % (UI_HYSTERESIS_TIME / DT_CTRL) == 0:
         self.lead = hud_control.leadVisible
@@ -228,7 +228,7 @@ class CarController(CarControllerBase):
           else:
             self.distance_button = 0
 
-        if self.CP.isToyotaPriusV and self.CP.longitudinalCydiaTuning:
+        if self.CP.longitudinalCydiaTuning:
           # Set thresholds for compensatory force calculations
           comp_thresh = float(np.interp(CS.out.vEgo, COMPENSATORY_CALCULATION_THRESHOLD_BP, COMPENSATORY_CALCULATION_THRESHOLD_V))
           if not CC.longActive:
