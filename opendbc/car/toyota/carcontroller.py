@@ -60,15 +60,16 @@ class CarController(CarControllerBase):
     self.last_torque = 0
     self.last_angle = 0
     self.alert_active = False
-    self.resume_off_frames = 0.
+    self.last_standstill = False
     self.standstill_req = False
-    self.stop_timer = 0.
     self.permit_braking = True
-    self._standstill_req = False
-    self.lead = False
     self.steer_rate_counter = 0
-    self.prohibit_neg_calculation = True
     self.distance_button = 0
+    self.resume_off_frames = 0.
+    self.stop_timer = 0.
+    self.standstill_req_ready = False
+    self.lead = False
+    self.prohibit_neg_calculation = True
 
     # *** start long control state ***
     self.long_pid = get_long_tune(self.CP, self.params)
@@ -175,34 +176,47 @@ class CarController(CarControllerBase):
 
     # *** gas and brake ***
 
-    # *** standstill logic ***
-    # mimic stock behaviour, set standstill_req to False only when openpilot wants to resume
-    if not CC.cruiseControl.resume:
+    if self.CP.isToyotaPriusV:
+      # *** standstill logic ***
+      # mimic stock behaviour, set standstill_req to False only when openpilot wants to resume
+      if not CC.cruiseControl.resume:
         self.resume_off_frames += 1  # frame counter for hysteresis
         # add a 1.5 second hysteresis to when CC.cruiseControl.resume turns off in order to prevent
         # vehicle's dash from blinking
         if self.resume_off_frames >= UI_HYSTERESIS_TIME / DT_CTRL:
-            self._standstill_req = True
-    else:
+          self.standstill_req_ready = True
+      else:
         self.resume_off_frames = 0
-        self._standstill_req = False
-    if CS.out.vEgo < 1e-3:
-      self.stop_timer += 1
+        self.standstill_req_ready = False
+
+      if CS.out.vEgo < 1e-3:
+        self.stop_timer += 1
+      else:
+        self.stop_timer = 0
+
+      # ignore standstill on NO_STOP_TIMER_CAR
+      self.standstill_req = actuators.longControlState == LongCtrlState.stopping and self.standstill_req_ready and self.stop_timer > 0.1 / DT_CTRL
     else:
-      self.stop_timer = 0
-    # ignore standstill on NO_STOP_TIMER_CAR
-    self.standstill_req = actuators.longControlState == LongCtrlState.stopping \
-                          and self._standstill_req \
-                          and self.stop_timer > 0.1 / DT_CTRL
+       # on entering standstill, send standstill request
+      if CS.out.standstill and not self.last_standstill and (self.CP.carFingerprint not in NO_STOP_TIMER_CAR):
+        self.standstill_req = True
+      if CS.pcm_acc_status != 8:
+        # pcm entered standstill or it's disabled
+        self.standstill_req = False
+      self.last_standstill = CS.out.standstill
 
     # handle UI messages
     fcw_alert = hud_control.visualAlert == VisualAlert.fcw
     steer_alert = hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw)
     # lead = hud_control.leadVisible or CS.out.vEgo < 12.  # at low speed we always assume the lead is present so ACC can be engaged
 
-    # *** ui hysteresis ***
-    if self.frame % (UI_HYSTERESIS_TIME / DT_CTRL) == 0:
-      self.lead = hud_control.leadVisible
+    if self.CP.isToyotaPriusV:
+      # *** ui hysteresis ***
+      if self.frame % (UI_HYSTERESIS_TIME / DT_CTRL) == 0:
+        self.lead = hud_control.leadVisible
+      lead = self.lead or CS.out.vEgo < 12.
+    else:
+      lead = hud_control.leadVisible or CS.out.vEgo < 12.  # at low speed we always assume the lead is present so ACC can be engaged
 
     if self.CP.openpilotLongitudinalControl:
       if self.frame % 3 == 0:
@@ -214,7 +228,7 @@ class CarController(CarControllerBase):
           else:
             self.distance_button = 0
 
-        if self.CP.carFingerprint == CAR.TOYOTA_PRIUS_V and self.CP.longitudinalCydiaTuning:
+        if self.CP.isToyotaPriusV and self.CP.longitudinalCydiaTuning:
           # Set thresholds for compensatory force calculations
           comp_thresh = float(np.interp(CS.out.vEgo, COMPENSATORY_CALCULATION_THRESHOLD_BP, COMPENSATORY_CALCULATION_THRESHOLD_V))
           if not CC.longActive:
@@ -277,7 +291,7 @@ class CarController(CarControllerBase):
           pcm_accel_cmd = float(np.clip(pcm_accel_cmd, self.params.ACCEL_MIN, self.params.ACCEL_MAX))
 
         can_sends.append(toyotacan.create_accel_command(self.packer, pcm_accel_cmd, pcm_cancel_cmd, self.permit_braking,
-                                                        self.standstill_req and self.CP.carFingerprint not in NO_STOP_TIMER_CAR, self.lead or CS.out.vEgo < 12.,
+                                                        self.standstill_req and self.CP.carFingerprint not in NO_STOP_TIMER_CAR, lead,
                                                         CS.acc_type, fcw_alert, self.distance_button,
                                                         accel_net=actuators.accel if self.CP.longitudinalCydiaTuning else None))
         self.accel = pcm_accel_cmd
@@ -288,8 +302,9 @@ class CarController(CarControllerBase):
         if self.CP.carFingerprint in UNSUPPORTED_DSU_CAR:
           can_sends.append(toyotacan.create_acc_cancel_command(self.packer))
         else:
-          can_sends.append(toyotacan.create_accel_command(self.packer, 0, pcm_cancel_cmd, True, False,
-                                                          self.lead or CS.out.vEgo < 12., CS.acc_type, False, self.distance_button,
+          can_sends.append(toyotacan.create_accel_command(self.packer, 0, pcm_cancel_cmd, True,
+                                                          False, lead,
+                                                          CS.acc_type, False, self.distance_button,
                                                           accel_net=actuators.accel if self.CP.longitudinalCydiaTuning else None))
 
     # *** hud ui ***
