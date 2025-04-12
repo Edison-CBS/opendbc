@@ -22,7 +22,7 @@ class TestToyotaSafetyBase(common.PandaCarSafetyTest, common.LongitudinalAccelSa
 
   TX_MSGS = TOYOTA_COMMON_TX_MSGS + TOYOTA_COMMON_LONG_TX_MSGS
   RELAY_MALFUNCTION_ADDRS = {0: (0x2E4, 0x191, 0x412)}
-  FWD_BLACKLISTED_ADDRS = {2: [0x2E4, 0x412, 0x191, 0x343]}
+  FWD_BLACKLISTED_ADDRS = {2: [0x2E4, 0x412, 0x191]}
   EPS_SCALE = 73
 
   packer: CANPackerPanda
