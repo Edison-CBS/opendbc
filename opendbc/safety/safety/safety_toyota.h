@@ -4,7 +4,7 @@
 
 // Stock longitudinal
 #define TOYOTA_BASE_TX_MSGS \
-  {0x191, 0, 8, .check_relay = false}, {0x412, 0, 8, .check_relay = false}, {0x1D2, 0, 8, .check_relay = false}, /* LKAS + LTA + PCM cancel cmd */  \
+  {0x191, 0, 8, .check_relay = true}, {0x412, 0, 8, .check_relay = true}, {0x1D2, 0, 8, .check_relay = false}, /* LKAS + LTA + PCM cancel cmd */  \
   {0x750, 0, 8, .check_relay = false},  /* white list 0x750 for Enhanced Diagnostic Request */  \
 
 #define TOYOTA_COMMON_TX_MSGS \
