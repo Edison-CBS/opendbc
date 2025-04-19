@@ -127,7 +127,7 @@ class CarInterface(CarInterfaceBase):
         if alpha_long and candidate in RADAR_ACC_CAR:
           ret.flags |= ToyotaFlags.DISABLE_RADAR.value
       else:
-        use_sdsu = use_sdsu and experimental_long
+        use_sdsu = use_sdsu and alpha_long
 
     # openpilot longitudinal enabled by default:
     #  - non-(TSS2 radar ACC cars) w/ smartDSU installed
