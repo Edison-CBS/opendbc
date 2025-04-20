@@ -38,8 +38,8 @@
   TOYOTA_COMMON_RX_CHECKS(lta)                                                                                 \
   {.msg = {{0x1D2, 0, 8, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},                            \
   {.msg = {{0x226, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U},  { 0 }, { 0 }}},  \
-  {.msg = {{0x1D3, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 100U}, { 0 }, { 0 }}},  \
-  {.msg = {{0x365, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 50U}, { 0 }, { 0 }}},   \
+  {.msg = {{0x1D3, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},  \
+  {.msg = {{0x365, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},   \
 
 #define TOYOTA_ALT_BRAKE_RX_CHECKS(lta)                                                                       \
   TOYOTA_COMMON_RX_CHECKS(lta)                                                                                \
