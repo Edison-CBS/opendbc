@@ -4,8 +4,7 @@
 
 // Stock longitudinal
 #define TOYOTA_BASE_TX_MSGS \
-  {0x191, 0, 8, .check_relay = true}, {0x412, 0, 8, .check_relay = true}, {0x1D2, 0, 8, .check_relay = false}, /* LKAS + LTA + PCM cancel cmd */  \
-  {0x750, 0, 8, .check_relay = false},  /* white list 0x750 for Enhanced Diagnostic Request */  \
+  {0x191, 0, 8, .check_relay = true}, {0x412, 0, 8, .check_relay = true}, {0x1D2, 0, 8, .check_relay = false},  /* LKAS + LTA + PCM cancel cmd */  \
 
 #define TOYOTA_COMMON_TX_MSGS \
   TOYOTA_BASE_TX_MSGS \
@@ -27,8 +26,10 @@
   {0x470, 1, 4, .check_relay = false}, \
   /* PCS_HUD */                        \
   {0x411, 0, 8, .check_relay = false}, \
+  /* radar diagnostic address */       \
+  {0x750, 0, 8, .check_relay = false}, \
   /* ACC */                            \
-  {0x343, 0, 8, .check_relay = false},  \
+  {0x343, 0, 8, .check_relay = true},  \
 
 #define TOYOTA_COMMON_RX_CHECKS(lta)                                                                          \
   {.msg = {{ 0xaa, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 83U}, { 0 }, { 0 }}},  \
@@ -38,8 +39,6 @@
   TOYOTA_COMMON_RX_CHECKS(lta)                                                                                 \
   {.msg = {{0x1D2, 0, 8, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},                            \
   {.msg = {{0x226, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U},  { 0 }, { 0 }}},  \
-  {.msg = {{0x1D3, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},  \
-  {.msg = {{0x365, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},   \
 
 #define TOYOTA_ALT_BRAKE_RX_CHECKS(lta)                                                                       \
   TOYOTA_COMMON_RX_CHECKS(lta)                                                                                \
@@ -56,12 +55,7 @@ static bool toyota_secoc = false;
 static bool toyota_alt_brake = false;
 static bool toyota_stock_longitudinal = false;
 static bool toyota_lta = false;
-static int toyota_dbc_eps_torque_factor = 100;  // conversion factor for STEER_TORQUE_EPS in %: see dbc file
-
-static bool toyota_unsupported_dsu_car = false;
-static bool toyota_allow_uds = false;  // Allow UDS (0x750) messages other than tester present
-bool toyota_get_acc_main_on(void);
-static void update_acc_main_on(const CANPacket_t *to_push);
+static int toyota_dbc_eps_torque_factor = 100;   // conversion factor for STEER_TORQUE_EPS in %: see dbc file
 
 static uint32_t toyota_compute_checksum(const CANPacket_t *to_push) {
   int addr = GET_ADDR(to_push);
@@ -150,9 +144,6 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
       }
     }
 
-    update_acc_main_on(to_push);
-    (void)toyota_get_acc_main_on();
-
     // sample speed
     if (addr == 0xaa) {
       int speed = 0;
@@ -167,29 +158,6 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
       UPDATE_VEHICLE_SPEED(speed / 4.0 * 0.01 / 3.6);
     }
   }
-}
-
-static void update_acc_main_on(const CANPacket_t *to_push) {
-  // Lateral control engagement is gated by the ACC main switch (MAIN_ON)
-  int addr = GET_ADDR(to_push);
-
-  if (addr == 0x1D3) {
-    acc_main_on = (GET_BIT(to_push, 15U) != 0U);
-  } else if ((addr == 0x365) && toyota_unsupported_dsu_car) {
-    acc_main_on = (GET_BIT(to_push, 0U) != 0U);
-  } else {
-    (void)0;  // MISRA 15.5: non-empty block
-  }
-}
-
-__attribute__((noinline))
-bool toyota_get_acc_main_on(void) {
-  return acc_main_on;
-}
-
-// "Tester Present" UDS msg to radar sub-address 0xF: 0x0F 0x02 0x3E 0x00...
-static bool is_tester_present_msg(const CANPacket_t *to_send) {
-  return (GET_BYTES(to_send, 0, 4) == 0x003E020FU) && (GET_BYTES(to_send, 4, 4) == 0x0U);
 }
 
 static bool toyota_tx_hook(const CANPacket_t *to_send) {
@@ -244,20 +212,18 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
       int desired_accel = (GET_BYTE(to_send, 0) << 8) | GET_BYTE(to_send, 1);
       desired_accel = to_signed(desired_accel, 16);
 
-      bool cancel_req = GET_BIT(to_send, 24U);
       bool violation = false;
+      violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
 
+      // only ACC messages that cancel are allowed when openpilot is not controlling longitudinal
       if (toyota_stock_longitudinal) {
-        // In stock longitudinal mode, only the ACC cancel command is allowed, and the acceleration command must be equal to inactive_accel (typically 0)
+        bool cancel_req = GET_BIT(to_send, 24U);
         if (!cancel_req) {
           violation = true;
         }
         if (desired_accel != TOYOTA_LONG_LIMITS.inactive_accel) {
           violation = true;
         }
-      } else {
-        // In non-stock longitudinal mode, ensure the requested acceleration is within defined safety limits
-        violation |= longitudinal_accel_checks(desired_accel, TOYOTA_LONG_LIMITS);
       }
 
       if (violation) {
@@ -354,16 +320,12 @@ static bool toyota_tx_hook(const CANPacket_t *to_send) {
     }
   }
 
-  // UDS: Allow only valid tester present messages to 0x750 if allowed.
-  // If stock longitudinal mode is enabled, block all 0x750 TX regardless.
+  // UDS: Only tester present ("\x0F\x02\x3E\x00\x00\x00\x00\x00") allowed on diagnostics address
   if (addr == 0x750) {
-    // In stock longitudinal mode, block all UDS messages including tester present
-    if (toyota_stock_longitudinal) {
-      tx = false;
-    }
-    // If not explicitly allowed, only permit valid tester present messages
-    if (!toyota_allow_uds && !is_tester_present_msg(to_send)) {
-      tx = false;
+    // this address is sub-addressed. only allow tester present to radar (0xF)
+    bool invalid_uds_msg = (GET_BYTES(to_send, 0, 4) != 0x003E020FU) || (GET_BYTES(to_send, 4, 4) != 0x0U);
+    if (invalid_uds_msg) {
+      tx = 0;
     }
   }
 
@@ -396,15 +358,10 @@ static safety_config toyota_init(uint16_t param) {
   toyota_secoc = GET_FLAG(param, TOYOTA_PARAM_SECOC);
 #endif
 
-  const uint32_t TOYOTA_PARAM_ALLOW_UDS = 64UL << TOYOTA_PARAM_OFFSET;
-  const uint32_t TOYOTA_PARAM_UNSUPPORTED_DSU_CAR = 128UL << TOYOTA_PARAM_OFFSET;
-
   toyota_alt_brake = GET_FLAG(param, TOYOTA_PARAM_ALT_BRAKE);
   toyota_stock_longitudinal = GET_FLAG(param, TOYOTA_PARAM_STOCK_LONGITUDINAL);
   toyota_lta = GET_FLAG(param, TOYOTA_PARAM_LTA);
   toyota_dbc_eps_torque_factor = param & TOYOTA_EPS_FACTOR;
-  toyota_unsupported_dsu_car = GET_FLAG(param, TOYOTA_PARAM_UNSUPPORTED_DSU_CAR);
-  toyota_allow_uds = GET_FLAG(param, TOYOTA_PARAM_ALLOW_UDS);  // Allow full UDS access (e.g., 0x750), only if explicitly enabled
 
   safety_config ret;
   if (toyota_stock_longitudinal) {
@@ -455,5 +412,4 @@ const safety_hooks toyota_hooks = {
   .get_checksum = toyota_get_checksum,
   .compute_checksum = toyota_compute_checksum,
   .get_quality_flag_valid = toyota_get_quality_flag_valid,
-  .get_acc_main_on = toyota_get_acc_main_on,
 };
