@@ -195,7 +195,7 @@ class CarController(CarControllerBase):
         self.stop_timer = 0
 
       # ignore standstill on NO_STOP_TIMER_CAR
-      self.standstill_req = actuators.longControlState == LongCtrlState.stopping and self.standstill_req_ready and self.stop_timer > 0.1 / DT_CTRL
+      self.standstill_req = actuators.longControlState == LongCtrlState.stopping and self.standstill_req_ready and self.stop_timer > 0.5 / DT_CTRL
     else:
       # on entering standstill, send standstill request
       if CS.out.standstill and not self.last_standstill and (self.CP.carFingerprint not in NO_STOP_TIMER_CAR):
