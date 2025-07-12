@@ -158,7 +158,8 @@ class CarInterface(CarInterfaceBase):
     ret.minEnableSpeed = -1. if stop_and_go else MIN_ACC_SPEED
 
     if candidate == CAR.TOYOTA_PRIUS_V:
-      ret.longitudinalTuning.kiV = [1.2]
+      ret.longitudinalTuning.kiBP = [0., 5.]
+      ret.longitudinalTuning.kiV = [1.4, 1.2]
       ret.isToyotaPriusV = True
 
       ret.stoppingDecelRate = 0.3  # reach stopping target smoothly
