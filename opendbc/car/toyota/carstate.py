@@ -193,13 +193,13 @@ class CarState(CarStateBase):
         buttonEvents.extend(create_button_events(1, 0, {1: ButtonType.lkas}) +
                             create_button_events(0, 1, {1: ButtonType.lkas}))
 
-      if self.CP.carFingerprint in (TSS2_CAR - RADAR_ACC_CAR) or (self.CP.flags & ToyotaFlags.SMART_DSU):
-        # distance button is wired to the ACC module (camera or radar)
-        prev_distance_button = self.distance_button
-        if self.CP.carFingerprint in (TSS2_CAR - RADAR_ACC_CAR):
-          self.distance_button = cp_acc.vl["ACC_CONTROL"]["DISTANCE"]
-        else:
-          self.distance_button = cp.vl["SDSU"]["FD_BUTTON"]
+    if self.CP.carFingerprint in (TSS2_CAR - RADAR_ACC_CAR) or (self.CP.flags & ToyotaFlags.SMART_DSU):
+      # distance button is wired to the ACC module (camera or radar)
+      prev_distance_button = self.distance_button
+      if self.CP.carFingerprint in (TSS2_CAR - RADAR_ACC_CAR):
+        self.distance_button = cp_acc.vl["ACC_CONTROL"]["DISTANCE"]
+      else:
+        self.distance_button = cp.vl["SDSU"]["FD_BUTTON"]
 
         buttonEvents += create_button_events(self.distance_button, prev_distance_button, {1: ButtonType.gapAdjustCruise})
     ret.buttonEvents = buttonEvents
