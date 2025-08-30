@@ -42,6 +42,7 @@ COMPENSATORY_CALCULATION_THRESHOLD_BP = [0., 20., 32.]  # m/s
 # resume, lead, and lane lines hysteresis
 UI_HYSTERESIS_TIME = 3.  # seconds
 
+
 def get_long_tune(CP, params):
   if CP.carFingerprint in TSS2_CAR:
     kiBP = [2., 5.]
@@ -269,20 +270,27 @@ class CarController(CarControllerBase):
           self.aego.update(a_ego_blended)
           j_ego = (self.aego.x - prev_aego) / (DT_CTRL * 3)
 
-          error_future = pcm_accel_cmd - a_ego_future
+          future_t = float(np.interp(CS.out.vEgo, [2., 5.], [0.25, 0.5]))
+          a_ego_future = a_ego_blended + j_ego * future_t
 
-          if not stopping:
-            # Toyota's PCM slowly responds to changes in pitch. On change, we amplify our
-            # acceleration request to compensate for the undershoot and following overshoot
-            high_pass_pitch = self.pitch.x - self.pitch_slow.x
-            pitch_compensation = float(np.clip(math.sin(high_pass_pitch) * ACCELERATION_DUE_TO_GRAVITY,
-                                               -MAX_PITCH_COMPENSATION, MAX_PITCH_COMPENSATION))
-            pcm_accel_cmd += pitch_compensation
+          if CC.longActive:
+            # constantly slowly unwind integral to recover from large temporary errors
+            self.long_pid.i -= ACCEL_PID_UNWIND * float(np.sign(self.long_pid.i))
 
-          pcm_accel_cmd = self.long_pid.update(error_future,
-                                               speed=CS.out.vEgo,
-                                               feedforward=pcm_accel_cmd,
-                                               freeze_integrator=actuators.longControlState != LongCtrlState.pid)
+            error_future = pcm_accel_cmd - a_ego_future
+
+            if not stopping:
+              # Toyota's PCM slowly responds to changes in pitch. On change, we amplify our
+              # acceleration request to compensate for the undershoot and following overshoot
+              high_pass_pitch = self.pitch.x - self.pitch_slow.x
+              pitch_compensation = float(np.clip(math.sin(high_pass_pitch) * ACCELERATION_DUE_TO_GRAVITY,
+                                                -MAX_PITCH_COMPENSATION, MAX_PITCH_COMPENSATION))
+              pcm_accel_cmd += pitch_compensation
+
+            pcm_accel_cmd = self.long_pid.update(error_future,
+                                                speed=CS.out.vEgo,
+                                                feedforward=pcm_accel_cmd,
+                                                freeze_integrator=actuators.longControlState != LongCtrlState.pid)
           else:
             self.long_pid.reset()
 
